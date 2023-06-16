@@ -3,6 +3,7 @@ import delay from "delay";
 import fs from "fs";
 import Papa from "papaparse";
 import axios from "axios";
+import { randomUUID } from "crypto";
 
 async function consolelog(...args) {
   console.log(...args);
@@ -77,7 +78,7 @@ export async function formatData(data: any, table: string, id: string = "id") {
   let formattedData = [];
   for (let i = 0; i < data.length; i++) {
     let result = await formatObject(table, data[i]);
-    formattedData.push(result);
+    formattedData.push({ ...result, id: randomUUID().slice(0, 8) });
   }
   await saveData(formattedData, id, "formatted");
   return formattedData;
@@ -114,7 +115,10 @@ export async function cleanData(data: any, id: string = "id", bar?: any) {
   let cleanedData = [];
   for (let i = 0; i < data.length; i++) {
     await delay(500);
-    let result = await cleanObject(data[i]);
+    let result = await cleanObject({
+      input: data[i].input,
+      output: data[i].output,
+    });
     // try to parse the result
     console.clear();
     try {
@@ -131,6 +135,7 @@ export async function cleanData(data: any, id: string = "id", bar?: any) {
       result.output == ""
     )
       continue;
+    result = { ...result, id: data[i].id };
     cleanedData.push(result);
     cleanedDataFull.push(result);
     await saveData(cleanedDataFull, id, "cleaning");

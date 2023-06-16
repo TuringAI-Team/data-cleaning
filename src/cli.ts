@@ -109,12 +109,12 @@ async function main() {
       `./steps/${id}/cleaning/data.json`,
       "utf-8"
     );
-    console.log(formattedData.length, cleanedData.length);
+    console.log(formattedData.length);
     if (cleanedData) {
       // remove the already cleaned data from the formatted data
       cleanedData = await JSON.parse(cleanedData);
       formattedData = formattedData.filter(
-        (item: any) => !cleanedData.includes(item)
+        (item: any) => !cleanedData.find((item2: any) => item.id === item2.id)
       );
     }
     console.log(formattedData.length, cleanedData.length);
