@@ -33,6 +33,7 @@ async function main() {
       const model = await askForModel();
       console.log(chalk.green(`Table: ${table}`));
       console.log(chalk.green(`Model: ${model}`));
+      console.log(chalk.green(`ID: ${id}`));
       await delay(1000);
       console.clear();
 
@@ -52,6 +53,7 @@ async function main() {
       const table = await askForTable();
       console.log(chalk.green(`File Path: ${filePath}`));
       console.log(chalk.green(`Table: ${table}`));
+      console.log(chalk.green(`ID: ${id}`));
       await delay(1000);
       console.clear();
       let spinner = createSpinner("Getting/formatting data");
@@ -69,6 +71,7 @@ async function main() {
       console.log(
         chalk.green(`Data saved to ./steps/${id}/formatted/data.json`)
       );
+      console.log(chalk.green(`ID: ${id}`));
       await delay(1000);
       console.clear();
       let maxThreads = await askMaxThreads();
@@ -80,6 +83,43 @@ async function main() {
       bar.start(formattedData.length, 0);
       await multithreads(formattedData, id, parseInt(maxThreads), bar);
     }
+  } else if (actionToDo == "continue cleaning data") {
+    let ids = await fs.readdir("./steps");
+    const { id } = await inquirer.prompt([
+      {
+        type: "list",
+        name: "id",
+        message: "Which dataset do you want to view?",
+        choices: ids,
+      },
+    ]);
+    console.clear();
+    console.log(chalk.green(`ID: ${id}`));
+    let maxThreads = await askMaxThreads();
+    console.clear();
+    let bar = new cliProgress.SingleBar({}, cliProgress.Presets.shades_classic);
+
+    let data: any = fs2.readFileSync(
+      `./steps/${id}/formatted/data.json`,
+      "utf-8"
+    );
+    // convert this csv to json
+    let formattedData = await JSON.parse(data);
+    let cleanedData: any = fs2.readFileSync(
+      `./steps/${id}/cleaning/data.json`,
+      "utf-8"
+    );
+    console.log(formattedData.length, cleanedData.length);
+    if (cleanedData) {
+      // remove the already cleaned data from the formatted data
+      cleanedData = await JSON.parse(cleanedData);
+      formattedData = formattedData.filter(
+        (item: any) => !cleanedData.includes(item)
+      );
+    }
+    console.log(formattedData.length, cleanedData.length);
+    bar.start(formattedData.length, 0);
+    await multithreads(formattedData, id, parseInt(maxThreads), bar);
   } else if (actionToDo == "view data") {
     console.clear();
     // read steps folder to get all ids that are the names of the folders
@@ -104,6 +144,7 @@ async function main() {
       },
     ]);
     console.clear();
+    console.log(chalk.green(`ID: ${id}`));
     if (step === "all") {
       await viewStep(id, "raw");
       await viewStep(id, "formatted");
@@ -150,7 +191,7 @@ async function askActionToDo() {
       type: "list",
       name: "actionToDo",
       message: "What do you want to do?",
-      choices: ["clean data", "view data", "exit"],
+      choices: ["clean data", "view data", "continue cleaning data", "exit"],
     },
   ]);
   return actionToDo;

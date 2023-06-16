@@ -83,6 +83,7 @@ export async function formatData(data: any, table: string, id: string = "id") {
   return formattedData;
 }
 let status = 0;
+let cleanedDataFull = [];
 
 export async function multithreads<T>(
   data: T[],
@@ -131,10 +132,11 @@ export async function cleanData(data: any, id: string = "id", bar?: any) {
     )
       continue;
     cleanedData.push(result);
-    await saveData(cleanedData, id, "cleaning");
+    cleanedDataFull.push(result);
+    await saveData(cleanedDataFull, id, "cleaning");
   }
-  await saveData(cleanedData, id, "cleaned");
-  return cleanedData;
+  await saveData(cleanedDataFull, id, "cleaned");
+  return cleanedDataFull;
 }
 
 async function cleanObject(object: any, retry = 0) {
@@ -144,14 +146,24 @@ async function cleanObject(object: any, retry = 0) {
     let response = await chatgpt([
       {
         role: "system",
-        content:
-          'The user is going to give you a chunk of a dataset containing an instruction, input and output. Remove any personal information such as nicknames, names etc. Clean the chunk so it is viable for training a LLM. In case the input/output says to continue the previous response, JUST RETURN {"reason":"conversational"}. In case the input or ouput makes reference to previous messages, JUST RETURN {"reason":"conversational"}. In case the input or output makes reference to an attachment or image, JUST RETURN {"reason":"images"}. In case the inpput is irrelevant or not good for LLM training, JUST RETURN {"reason":"irrelevant"}. DO NOT ADD EXPLANATIONS. JUST ANSWER WITH THE CLEANED DATA',
+        content: `The user is going to give you a chunk of a dataset containing an input and output. First decide if the data is valid for training a LLM. In case it is valid, JUST RETURN A NEW OBJECT WITH THE SAME INPUT AND OUTPUT CLEANED. CLEANED means you remove nicknames, keys or any personal information from the input and output, if there not any personal information in the input or output JUST RETURN THEM. DO NOT ADD EXPLANATIONS. \nIn case it is not valid for training a LLM, JUST RETURN AN OBJECT like this {"reason": "reason"}. The reason can be: conversational, images, irrelevant. \nconversational: the input or the output makes reference to previous messages, or the input asks for continuation. \nimages: the input or the output makes reference to attachments.\nirrelevant: the input or the output are irrelevant or not complex enough to be used for training a LLM.\nDO NOT ADD EXPLANATIONS`,
       },
       {
         role: "user",
         content: `${JSON.stringify(object)}`,
       },
     ]);
+    response = response.replace("CLEANED: {", "{");
+    response = response.replace("Valid.", "");
+    if (response.includes('"output":{"reason":"conversational"}}')) {
+      return '{"reason":"conversational"}';
+    }
+    if (response.includes('"output":{"reason":"images"}}')) {
+      return '{"reason":"images"}';
+    }
+    if (response.includes('"output":{"reason":"irrelevant"}}')) {
+      return '{"reason":"irrelevant"}';
+    }
     return response;
   } catch (error) {
     if (retry >= 3) {
@@ -180,9 +192,9 @@ async function chatgpt(messages: any) {
     },
     data: {
       model: "gpt-3.5-turbo",
-      max_tokens: 3000,
+      max_tokens: 2000,
       messages: messages,
-      temperature: 0.3,
+      temperature: 0.1,
     },
   });
   if (!response.data.choices) {
